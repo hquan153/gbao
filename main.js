@@ -1,7 +1,8 @@
+const fs = require("fs");
 const ExcelJS = require("exceljs");
 
 const URL_BASE = "https://dchart-api.vndirect.com.vn/dchart/history";
-const DATA_FILE_NAME = "./data.xlsx";
+const FILE_PATH = "./data.xlsx";
 
 const TICKERS = [
   "ACB",
@@ -38,6 +39,7 @@ const TICKERS = [
 ];
 
 const YEARS = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];
+// const YEAR_TIMESTAMP = [2019, 2026];
 
 const HEADERS = {
   headers: {
@@ -46,10 +48,10 @@ const HEADERS = {
   },
 };
 
-const crawl = async (ticker, year) => {
+const crawl = async (ticker, yearStart, yearEnd = yearStart) => {
   try {
-    const fromTimestamp = Math.floor(new Date(`${year}-01-01`).getTime() / 1000);
-    const toTimestamp = Math.floor(new Date(`${year}-12-31`).getTime() / 1000);
+    const fromTimestamp = Math.floor(new Date(`${yearStart}-01-01`).getTime() / 1000);
+    const toTimestamp = Math.floor(new Date(`${yearEnd}-12-31`).getTime() / 1000);
 
     const url = `${URL_BASE}?resolution=D&symbol=${ticker.toUpperCase()}&from=${fromTimestamp}&to=${toTimestamp}`;
 
@@ -67,11 +69,12 @@ const crawl = async (ticker, year) => {
 
 const crawlAll = async () => {
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.readFile(DATA_FILE_NAME);
   workbook.calcProperties.fullCalcOnLoad = true;
 
+  if (fs.existsSync(FILE_PATH)) fs.unlink(FILE_PATH, (error) => error && console.log(error));
+
   for (const ticker of TICKERS) {
-    const sheet = workbook.getWorksheet(ticker);
+    const sheet = workbook.addWorksheet(ticker);
 
     let lineOrder = 1;
     for (const year of YEARS) {
@@ -82,10 +85,44 @@ const crawlAll = async () => {
 
       lineOrder += 2;
     }
+
+    console.log("crawled", ticker);
   }
 
-  await workbook.xlsx.writeFile(DATA_FILE_NAME);
-  console.log(`Saved to ${DATA_FILE_NAME}!`);
+  await workbook.xlsx.writeFile(FILE_PATH);
+  console.log(`Saved to ${FILE_PATH}`);
 };
+
+/* const crawlAll = async () => {
+  const workbook = new ExcelJS.Workbook();
+  workbook.calcProperties.fullCalcOnLoad = true;
+
+  let isExist = false;
+  if (fs.existsSync(FILE_PATH)) {
+    isExist = true;
+    await workbook.xlsx.readFile(FILE_PATH);
+  }
+
+  for (const ticker of TICKERS) {
+    let sheet;
+    if (isExist) sheet = workbook.getWorksheet(ticker);
+    else sheet = workbook.addWorksheet(ticker);
+
+    let lineOrder = 1;
+    for (const year of YEARS) {
+      const { dates, prices } = await crawl(ticker, year, year);
+
+      sheet.getRow(lineOrder).values = [year, ...dates];
+      sheet.getRow(lineOrder + 1).values = ["", ...prices];
+
+      lineOrder += 2;
+    }
+
+    console.log("crawled", ticker);
+  }
+
+  await workbook.xlsx.writeFile(FILE_PATH);
+  console.log(`Saved to ${FILE_PATH}!`);
+}; */
 
 crawlAll();
