@@ -1,4 +1,3 @@
-const fs = require("fs");
 const ExcelJS = require("exceljs");
 
 const URL_BASE = "https://dchart-api.vndirect.com.vn/dchart/history";
@@ -45,7 +44,7 @@ const tickers = [
   "BVH",
 ];
 
-const years = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];
+const years = [2019, 2026];
 
 const crawl = async (ticker, yearStart, yearEnd = yearStart) => {
   try {
@@ -73,14 +72,12 @@ const crawlAll = async () => {
   const workbook = new ExcelJS.Workbook();
   workbook.calcProperties.fullCalcOnLoad = true;
 
-  if (fs.existsSync(FILE_PATH)) fs.unlink(FILE_PATH, (error) => error && console.log(error));
-
-  for (const ticker of tickers) {
-    const sheet = workbook.addWorksheet(ticker);
+  for (const i in tickers) {
+    const sheet = workbook.addWorksheet(tickers[i]);
 
     let lineOrder = 1;
-    for (let year = years[0]; year <= years.at(-1); year++) {
-      const { dates, prices } = await crawl(ticker, year);
+    for (let year = Math.min(...years); year <= Math.max(...years); year++) {
+      const { dates, prices } = await crawl(tickers[i], year);
 
       sheet.getRow(lineOrder).values = [year, ...dates];
       sheet.getRow(lineOrder + 1).values = ["", ...prices];
@@ -88,7 +85,7 @@ const crawlAll = async () => {
       lineOrder += 2;
     }
 
-    console.log("crawled", ticker);
+    console.log(`crawled ${tickers[i]} - ${+i + 1}`);
   }
 
   await workbook.xlsx.writeFile(FILE_PATH);
