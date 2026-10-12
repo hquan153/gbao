@@ -4,7 +4,14 @@ const ExcelJS = require("exceljs");
 const URL_BASE = "https://dchart-api.vndirect.com.vn/dchart/history";
 const FILE_PATH = "./data.xlsx";
 
-const TICKERS = [
+const HEADERS = {
+  headers: {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0",
+    Referer: "https://dchart.vndirect.com.vn/",
+  },
+};
+
+const tickers = [
   "ACB",
   "BID",
   "CTG",
@@ -38,15 +45,7 @@ const TICKERS = [
   "BVH",
 ];
 
-const YEARS = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];
-// const YEAR_TIMESTAMP = [2019, 2026];
-
-const HEADERS = {
-  headers: {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0",
-    Referer: "https://dchart.vndirect.com.vn/",
-  },
-};
+const years = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];
 
 const crawl = async (ticker, yearStart, yearEnd = yearStart) => {
   try {
@@ -57,10 +56,13 @@ const crawl = async (ticker, yearStart, yearEnd = yearStart) => {
 
     const res = await (await fetch(url, HEADERS)).json();
 
-    if (!res || !res.s === "ok") return {};
+    if (res && res.s === "ok") {
+      const dates = res.t.map((seconds) => new Date(seconds * 1000).toLocaleDateString("vi-VN"));
+      return { dates, prices: [...res.c] };
+    }
 
-    const dates = res.t.map((seconds) => new Date(seconds * 1000).toLocaleDateString("vi-VN"));
-    return { dates, prices: [...res.c] };
+    console.error("error at res!");
+    return {};
   } catch (error) {
     console.error(`ERROR at ${ticker}: ${error.message}`);
     return {};
@@ -73,11 +75,11 @@ const crawlAll = async () => {
 
   if (fs.existsSync(FILE_PATH)) fs.unlink(FILE_PATH, (error) => error && console.log(error));
 
-  for (const ticker of TICKERS) {
+  for (const ticker of tickers) {
     const sheet = workbook.addWorksheet(ticker);
 
     let lineOrder = 1;
-    for (const year of YEARS) {
+    for (let year = years[0]; year <= years.at(-1); year++) {
       const { dates, prices } = await crawl(ticker, year);
 
       sheet.getRow(lineOrder).values = [year, ...dates];
@@ -90,7 +92,7 @@ const crawlAll = async () => {
   }
 
   await workbook.xlsx.writeFile(FILE_PATH);
-  console.log(`Saved to ${FILE_PATH}`);
+  console.log("Saved to", FILE_PATH);
 };
 
 /* const crawlAll = async () => {
@@ -103,7 +105,7 @@ const crawlAll = async () => {
     await workbook.xlsx.readFile(FILE_PATH);
   }
 
-  for (const ticker of TICKERS) {
+  for (const ticker of tickers) {
     let sheet;
     if (isExist) sheet = workbook.getWorksheet(ticker);
     else sheet = workbook.addWorksheet(ticker);
