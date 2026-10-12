@@ -1,7 +1,7 @@
 const ExcelJS = require("exceljs");
 
 const URL_BASE = "https://dchart-api.vndirect.com.vn/dchart/history";
-const FILE_PATH = "./data8.xlsx";
+const FILE_PATH = "./data.xlsx";
 
 const HEADERS = {
   headers: {
@@ -116,6 +116,7 @@ const crawlAll = async () => {
   const workbook = new ExcelJS.Workbook();
   workbook.calcProperties.fullCalcOnLoad = true;
 
+  // crawl
   for (const group of tickers) {
     for (const ticker of group.companies) {
       const sheet = workbook.addWorksheet(ticker);
@@ -139,6 +140,7 @@ const crawlAll = async () => {
     console.log("--CRAWLED", group.groupName.toUpperCase());
   }
 
+  // caculate
   for (const group of tickers) {
     const sheet = workbook.addWorksheet(group.groupName);
     let lineOrder = 1;
@@ -166,6 +168,7 @@ const crawlAll = async () => {
     }
   }
 
+  // adjust
   workbook.eachSheet((sheet) => {
     sheet.columns.forEach((column) => {
       let maxChars = 8;
