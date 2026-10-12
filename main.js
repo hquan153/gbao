@@ -1,7 +1,7 @@
 const ExcelJS = require("exceljs");
 
 const URL_BASE = "https://dchart-api.vndirect.com.vn/dchart/history";
-const FILE_PATH = "./data.xlsx";
+const FILE_PATH = "./data8.xlsx";
 
 const HEADERS = {
   headers: {
@@ -11,37 +11,76 @@ const HEADERS = {
 };
 
 const tickers = [
-  "ACB",
-  "BID",
-  "CTG",
-  "HDB",
-  "LPB",
-  "MBB",
-  "SHB",
-  "SSB",
-  "STB",
-  "TCB",
-  "VCB",
-  "VIB",
-  "VPB",
-  "VIC",
-  "VHM",
-  "VRE",
-  "VPL",
-  "FPT",
-  "MSN",
-  "MCH",
-  "MWG",
-  "VNM",
-  "SAB",
-  "GAS",
-  "BSR",
-  "POW",
-  "HPG",
-  "GVR",
-  "SSI",
-  "TCX",
-  "BVH",
+  {
+    groupName: "Cụm ngân hàng",
+    companies: ["ACB", "BID", "CTG", "HDB", "LPB", "MBB", "SHB", "SSB", "STB", "TCB", "VCB", "VIB", "VPB"],
+    average: {
+      acb: [],
+      bid: [],
+      ctg: [],
+      hdb: [],
+      lpb: [],
+      mbb: [],
+      shb: [],
+      ssb: [],
+      stb: [],
+      tcb: [],
+      vcb: [],
+      vib: [],
+      vpb: [],
+    },
+    standardDeviation: {
+      acb: [],
+      bid: [],
+      ctg: [],
+      hdb: [],
+      lpb: [],
+      mbb: [],
+      shb: [],
+      ssb: [],
+      stb: [],
+      tcb: [],
+      vcb: [],
+      vib: [],
+      vpb: [],
+    },
+  },
+  {
+    groupName: "Cụm bất động sản",
+    companies: ["VIC", "VHM", "VRE", "VPL"],
+    average: { vic: [], vhm: [], vre: [], vpl: [] },
+    standardDeviation: { vic: [], vhm: [], vre: [], vpl: [] },
+  },
+  {
+    groupName: "Nhóm công nghệ thông tin và viễn thông",
+    companies: ["FPT"],
+    average: { fpt: [] },
+    standardDeviation: { fpt: [] },
+  },
+  {
+    groupName: "Nhóm tiêu dùng, bán lẻ và sản xuất",
+    companies: ["MSN", "MCH", "MWG", "VNM", "SAB"],
+    average: { msn: [], mch: [], mwg: [], vnm: [], sab: [] },
+    standardDeviation: { msn: [], mch: [], mwg: [], vnm: [], sab: [] },
+  },
+  {
+    groupName: "Nhóm năng lượng, dầu khí",
+    companies: ["GAS", "BSR", "POW"],
+    average: { gas: [], bsr: [], pow: [] },
+    standardDeviation: { gas: [], bsr: [], pow: [] },
+  },
+  {
+    groupName: "Nhóm công nghiệp, nguyên vật liệu và cao su",
+    companies: ["HPG", "GVR"],
+    average: { hpg: [], gvr: [] },
+    standardDeviation: { hpg: [], gvr: [] },
+  },
+  {
+    groupName: "Nhóm tài chính - chứng khoán và bảo hiểm",
+    companies: ["SSI", "TCX", "BVH"],
+    average: { ssi: [], tcx: [], bvh: [] },
+    standardDeviation: { ssi: [], tcx: [], bvh: [] },
+  },
 ];
 
 const years = [2019, 2026];
@@ -68,60 +107,80 @@ const crawl = async (ticker, yearStart, yearEnd = yearStart) => {
   }
 };
 
+const getAverage = (nums) => nums.reduce((total, num) => total + num, 0) / nums.length || 0;
+
+const standardDeviation = (nums, average) =>
+  Math.sqrt(nums.reduce((total, num) => total + (num - average) ** 2, 0) / nums.length) || 0;
+
 const crawlAll = async () => {
   const workbook = new ExcelJS.Workbook();
   workbook.calcProperties.fullCalcOnLoad = true;
 
-  for (const i in tickers) {
-    const sheet = workbook.addWorksheet(tickers[i]);
+  for (const group of tickers) {
+    for (const ticker of group.companies) {
+      const sheet = workbook.addWorksheet(ticker);
 
-    let lineOrder = 1;
-    for (let year = Math.min(...years); year <= Math.max(...years); year++) {
-      const { dates, prices } = await crawl(tickers[i], year);
+      let lineOrder = 1;
+      for (let year = Math.min(...years); year <= Math.max(...years); year++) {
+        const { dates, prices } = await crawl(ticker, year);
 
-      sheet.getRow(lineOrder).values = [year, ...dates];
-      sheet.getRow(lineOrder + 1).values = ["", ...prices];
+        const average = getAverage([...prices]);
+        group.average[ticker.toLowerCase()].push(average);
+        group.standardDeviation[ticker.toLowerCase()].push(standardDeviation([...prices], average));
 
-      lineOrder += 2;
+        sheet.getRow(lineOrder).values = [year, ...dates];
+        sheet.getRow(lineOrder + 1).values = ["", ...prices];
+        lineOrder += 2;
+      }
+
+      console.log("crawled", ticker);
     }
 
-    console.log(`crawled ${tickers[i]} - ${+i + 1}`);
+    console.log("--CRAWLED", group.groupName.toUpperCase());
   }
+
+  for (const group of tickers) {
+    const sheet = workbook.addWorksheet(group.groupName);
+    let lineOrder = 1;
+
+    for (const ticker of group.companies) {
+      sheet.mergeCells(lineOrder, 1, lineOrder, 3);
+
+      const cell = sheet.getCell(lineOrder, 1);
+      cell.value = ticker;
+
+      cell.font = { bold: true };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+
+      sheet.getRow(lineOrder + 1).values = ["", "Trung bình", "Độ lệch chuẩn"];
+
+      for (let i = 0; i < Math.max(...years) - Math.min(...years) + 1; i++) {
+        sheet.getRow(lineOrder + 2 + i).values = [
+          Math.min(...years) + i,
+          group.average[ticker.toLowerCase()][i],
+          group.standardDeviation[ticker.toLowerCase()][i],
+        ];
+      }
+
+      lineOrder += Math.max(...years) - Math.min(...years) + 1 + 2 + 1;
+    }
+  }
+
+  workbook.eachSheet((sheet) => {
+    sheet.columns.forEach((column) => {
+      let maxChars = 8;
+      column.eachCell({ includeEmpty: true }, (cell) => {
+        if (cell.isMerged) return;
+
+        const cellValue = cell.value ? cell.value.toString() : "";
+        if (cellValue.length > maxChars) maxChars = cellValue.length;
+      });
+      column.width = maxChars < 12 ? 12 : maxChars + 2;
+    });
+  });
 
   await workbook.xlsx.writeFile(FILE_PATH);
   console.log("Saved to", FILE_PATH);
 };
-
-/* const crawlAll = async () => {
-  const workbook = new ExcelJS.Workbook();
-  workbook.calcProperties.fullCalcOnLoad = true;
-
-  let isExist = false;
-  if (fs.existsSync(FILE_PATH)) {
-    isExist = true;
-    await workbook.xlsx.readFile(FILE_PATH);
-  }
-
-  for (const ticker of tickers) {
-    let sheet;
-    if (isExist) sheet = workbook.getWorksheet(ticker);
-    else sheet = workbook.addWorksheet(ticker);
-
-    let lineOrder = 1;
-    for (const year of YEARS) {
-      const { dates, prices } = await crawl(ticker, year, year);
-
-      sheet.getRow(lineOrder).values = [year, ...dates];
-      sheet.getRow(lineOrder + 1).values = ["", ...prices];
-
-      lineOrder += 2;
-    }
-
-    console.log("crawled", ticker);
-  }
-
-  await workbook.xlsx.writeFile(FILE_PATH);
-  console.log(`Saved to ${FILE_PATH}!`);
-}; */
 
 crawlAll();
