@@ -1,3 +1,4 @@
+const fs = require("fs");
 const ExcelJS = require("exceljs");
 
 const URL_BASE = "https://dchart-api.vndirect.com.vn/dchart/history";
@@ -115,6 +116,8 @@ const standardDeviation = (nums, average) =>
 const crawlAll = async () => {
   const workbook = new ExcelJS.Workbook();
   workbook.calcProperties.fullCalcOnLoad = true;
+
+  if (fs.existsSync(FILE_PATH)) fs.unlinkSync(FILE_PATH);
 
   // crawl
   for (const group of tickers) {
